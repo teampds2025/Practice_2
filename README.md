@@ -62,7 +62,7 @@ The system follows a modular design:
 4.  **Forecasting Module (EC2 - Planned):** Will handle feature engineering, model training, and prediction generation.
 5.  **Web Application (EC2 - Planned):** Flask backend and basic frontend for user interaction.
 
-*(Consider adding a link here if you create an architecture diagram image in your repository)*
+*(See `docs/` folder for detailed Architecture, ERD, and Data Flow diagrams)*
 
 ## Technology Stack
 
