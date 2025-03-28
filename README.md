@@ -91,19 +91,22 @@ The system follows a modular design:
     *   MySQL client tools (optional, for direct DB access)
 
 2.  **Clone Repository:**
+    ```bash
+    git clone https://github.com/teampds2025/Practice_2.git
+    ```
 
-3.  **Set Up Virtual Environment:**
+4.  **Set Up Virtual Environment:**
     ```bash
     python -m venv venv
     source venv/bin/activate 
     ```
 
-4.  **Install Dependencies:**
+5.  **Install Dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-5.  **Configuration:**
+6.  **Configuration:**
     *   Required variables:
         *   `DB_HOST`: Your AWS RDS endpoint URL
         *   `DB_NAME`: Your database name
@@ -113,7 +116,7 @@ The system follows a modular design:
         *   `WEATHER_API_KEY`: Your API key for the weather service (e.g., Visual Crossing)
         *   `ALERTS_API_TOKEN`: Your API token for the `alerts_in_ua` service
 
-6.  **Database Setup:**
+7.  **Database Setup:**
     *   Ensure your RDS instance is running and accessible from where you'll run the scripts (e.g., your EC2 instance).
     *   Run a script or manually use the `DatabaseHandler` class to:
         *   Create the necessary tables:
@@ -129,14 +132,14 @@ The system follows a modular design:
             db.initialize_regions_in_database()
             ```
 
-7.  **Running Collectors Manually (for testing):**
+8.  **Running Collectors Manually (for testing):**
     *   The receive_and_load.ipynb notebook provides detailed information regarding the use of collectors, adding and retrieving information from a database, adding information from files, etc.
 
-8.  **Scheduling with Cron (on EC2):**
+9.  **Scheduling with Cron (on EC2):**
     *   Create a main runner script (e.g., `daily_runner.py`) that imports and calls the necessary collector functions for the daily update (e.g., yesterday's ISW, today's weather forecast, active alerts).
     *   Set up a cron job on your EC2 instance to execute this script daily. Example crontab entry 
 
-9.  **Historical Data Ingestion:**
+10.  **Historical Data Ingestion:**
     *   Upload your historical CSV files (or other formats) to the EC2 instance.
     *   Use scripts similar to the examples in the provided Jupyter Notebook (`.ipynb` file) to:
         *   Read the file into a Pandas DataFrame (`pd.read_csv(...)`).
