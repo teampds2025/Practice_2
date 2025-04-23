@@ -1,0 +1,44 @@
+
+===== DATABASE CONNECTION ESTABLISHED =====
+
+===== TARGET DATETIME: 2025-04-23 =====
+
+===== STEP 1: PROCESSING WEATHER =====
+Filtering WEATHER data for the last available day.
+Executing query to fetch weather data...
+Retrieved 600 weather records.
+JSON data expanded successfully.
+
+===== STEP 2: PROCESSING ALARM FEATURES =====
+Retrieved 369 alert records.
+
+===== STEP 3: PROCESSING ISW REPORTS =====
+Successfully collected report for 2025-04-22
+Successfully inserted/handled 0 isw reports.
+Filtering ISW data for the last available day.
+
+===== STEP 4: PROCESSING TELEGRAM REPORTS =====
+Connected
+Fetching messages from chat: @war_monitor
+Date range: 2025-04-22 00:00:00 EEST to 2025-04-22 23:59:59 EEST
+Reached start date boundary.
+Finished fetching. Found 34 messages within the date range.
+Successfully converted 34 messages to DataFrame and saved to /home/ubuntu/jn/data/telegram_data/tg_messages_20250422.csv
+Disconnected.
+Successfully inserted/handled 0 telegram records.
+Filtering TELEGRAM data for the last available day.
+
+===== STEP 5: MERGING FINAL DATASET =====
+Successfully inserted/handled merged dataset of 0 rows. Sanity check for daily runner: expected value is 576/0
+Filtering PREDICTIONS data for the last available day.
+Retrieved 576 alert records.
+
+===== STEP 6: PROCESSING DAILY PREDICTIONS =====
+Successfully inserted/handled 0 predictions records. Sanity check for daily runner: expected value is 576/0
+Filtering PREDICTIONS data for the last available day.
+Retrieved 576 alert records.
+
+===== STEP 7: EVALUATING YESTERDAY'S PREDICTIONS =====
+Latest metric is calculated for 2025-04-23, while we need 2025-04-22. Skipping step 7 by now.
+
+===== DATABASE CONNECTION CLOSED =====
