@@ -100,10 +100,7 @@ async def prepare_final_dataset():
     merged_v3['day_of_week'] = merged_v3['datetime'].dt.dayofweek
     merged_v3['month'] = merged_v3['datetime'].dt.month
 
-    db.insert_merged_data(merged_v3)
-
-    # we get predictions for yesterday and evaluate them based on the actual alarm information that happened yesterday that we got today.
-    predictions_validate = db.get_predictions(daily_fetcher=True) 
+    db.insert_merged_data(merged_v3) 
     
     print("\n===== STEP 6: PROCESSING DAILY PREDICTIONS =====")
     process_daily_predictions(merged_v3, db)
@@ -131,14 +128,20 @@ async def prepare_final_dataset():
 
     
     print("\n===== STEP 7: EVALUATING YESTERDAY'S PREDICTIONS =====")    
+    # we get predictions for yesterday and evaluate them based on the actual alarm information that happened yesterday that we got today.
+    predictions_validate = db.get_predictions(specific_date=yesterday_target_date)
+    
     if predictions_validate.empty: 
-        print('The metrics table is empty. Metric evaluation will likely start tomorrow. Skipping step 7 by now.')
+        print('The predictions table is empty. Metric evaluation will likely start tomorrow. Skipping step 7 by now.')
     elif predictions_validate['date'][0] != timestamp_for_metrics:
         last_metric_date = predictions_validate['date'][0]
-        print(f'Latest metric is calculated for {last_metric_date.strftime("%Y-%m-%d")}, '
+        print(f'Latest prediction is calculated for {last_metric_date.strftime("%Y-%m-%d")}, '
               f'while we need {timestamp_for_metrics.strftime("%Y-%m-%d")}. Skipping step 7 by now.')
     else:
-        actual_alarm_set = get_and_process_validation_set(db)
+        actual_alarm_set = get_and_process_validation_set(db, yesterday_target_date)
+
+        actual_alarm_set = actual_alarm_set.sort_values(by=['hour_indicator', 'region_id'])
+        predictions_validate = predictions_validate.sort_values(by=['time', 'region_id'])
     
         actual_values = actual_alarm_set['is_alarm_active'].to_numpy()
         predicted_values = predictions_validate['prediction_value'].to_numpy()
@@ -154,7 +157,8 @@ async def prepare_final_dataset():
         roc_auc = roc_auc_score(actual_values, probabilities)
         conf_matrix = confusion_matrix(actual_values, predicted_values)
         conf_matrix_json = json.dumps(conf_matrix.tolist())
-        db.insert_metrics(today_target_date, 'hgb_v1', accuracy, precision, recall, f1_score, roc_auc, conf_matrix_json)
+        db.insert_metrics(yesterday_target_date, 'hgb_v3', accuracy, precision, recall, f1_score, roc_auc, conf_matrix_json)
+        print(db.get_metrics(daily_fetcher=True))
 
     print("\n===== DATABASE CONNECTION CLOSED =====")  
     db.disconnect()
