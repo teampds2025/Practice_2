@@ -58,13 +58,19 @@ class DatabaseHandler:
         try:
             if not self.connection or not self.connection.is_connected():
                 self.connect()
-
+    
             cursor = self.connection.cursor()
             cursor.execute(test)
-            for row in cursor.fetchall():
-                print(row)
+    
+            # Commit if it's not a SELECT (i.e., it's a write operation)
+            if not test.strip().lower().startswith("select"):
+                self.connection.commit()
+            else:
+                for row in cursor.fetchall():
+                    print(row)
+    
             cursor.close()
-
+    
         except Error as e:
             print(f"Error: {e}")
             return None
@@ -161,7 +167,7 @@ class DatabaseHandler:
                     model_id INT AUTO_INCREMENT PRIMARY KEY,
                     model_name VARCHAR(100),
                     model_version VARCHAR(20) UNIQUE,
-                    last_trained_on DATE,
+                    last_trained_on DATETIME,
                     model_blob LONGBLOB,
                     scaler_blob LONGBLOB
                 )
@@ -420,7 +426,7 @@ class DatabaseHandler:
              print(f"An unexpected error occurred retrieving model version {model_version}: {e}")
              return None, None
 
-    def get_model_info(self):
+    def get_model_info(self, daily_fetcher=False):
         """
         Retrieve metadata for all models stored in the 'model_versions' table.
 
@@ -432,17 +438,20 @@ class DatabaseHandler:
             if not self.connection or not self.connection.is_connected():
                 self.connect()
 
-            sql_query = """
+            base_query = """
                 SELECT model_name, model_version, last_trained_on, model_blob, scaler_blob FROM model_versions
             """
 
-            df = pd.read_sql(
-                sql_query,
-                self.connection,
-                parse_dates=['last_trained_on']
-            )
+            where_clause = ""
+            if daily_fetcher:
+                where_clause = "WHERE last_trained_on = (SELECT MAX(last_trained_on) FROM model_versions)"
+                print("Filtering Models data to find the most recent model.")
+
+            order_by_clause = "ORDER BY last_trained_on;"
+
+            sql_query = f"{base_query} {where_clause} {order_by_clause}"
             
-            return df
+            return pd.read_sql(sql_query, self.connection, parse_dates=['last_trained_on'])
 
         except Error as e:
             print(f"Database error retrieving model info: {e}")
@@ -593,7 +602,7 @@ class DatabaseHandler:
              print(f"An unexpected error occurred inserting predictions: {e}")
 
 
-    def get_predictions(self, daily_fetcher=False):
+    def get_predictions(self, specific_date=None, daily_fetcher=False):
         """
         Retrieves prediction data from the 'predictions' table, joined with region names.
 
@@ -620,10 +629,18 @@ class DatabaseHandler:
                             FROM predictions p
                             JOIN regions r ON p.region_id = r.region_id
                         """
-
+            
             where_clause = ""
-            if daily_fetcher:
-                where_clause = "WHERE date = (SELECT MAX(date) FROM predictions)"
+            params = []
+
+            if specific_date:
+                date_str = specific_date.strftime('%Y-%m-%d') if hasattr(specific_date, 'strftime') else str(specific_date)
+                where_clause = "WHERE p.date = %s"
+                params.append(date_str)
+                print(f"Filtering PREDICTIONS data for specific date: {date_str}.")
+
+            elif daily_fetcher:
+                where_clause = "WHERE p.date = (SELECT MAX(date) FROM predictions)"
                 print("Filtering PREDICTIONS data for the last available day.")
 
             sql_query = f"{base_query} {where_clause}"
@@ -631,6 +648,7 @@ class DatabaseHandler:
             df = pd.read_sql(
                 sql_query,
                 self.connection,
+                params=params if params else None, 
                 parse_dates=['date']
             )
 
@@ -1081,7 +1099,7 @@ class DatabaseHandler:
              return pd.DataFrame()
 
 
-    def get_alerts(self, weekly_fetcher=False, validation_set=False):
+    def get_alerts(self, weekly_fetcher=False, specific_date=None):
         """
         Retrieves alert data from the 'alarms' table, joined with region names.
 
@@ -1110,21 +1128,27 @@ class DatabaseHandler:
                 FROM alarms a
                 JOIN regions r ON a.region_id = r.region_id
             """
+            
 
             where_clause = ""
-            if weekly_fetcher:
+            params = []
+
+            if specific_date:
+                date_str = specific_date.strftime('%Y-%m-%d') if hasattr(specific_date, 'strftime') else str(specific_date)
+                where_clause = "WHERE DATE(start) = %s"
+                params.append(date_str)
+                print(f"Filtering ALARMS data for specific date: {date_str}.")
+
+            elif weekly_fetcher:
                 where_clause = "WHERE a.start >= (SELECT MAX(start) - INTERVAL 7 DAY FROM alarms)"
+                print("Filtering ALARMS data for the last available day.")
 
-            if validation_set:
-                where_clause = "WHERE DATE(a.start) = (SELECT MAX(DATE(start)) FROM alarms)"
-
-            order_by_clause = "ORDER BY a.start DESC;"
-
-            sql_query = f"{base_query} {where_clause} {order_by_clause}"
+            sql_query = f"{base_query} {where_clause}"
 
             df = pd.read_sql(
                 sql_query,
                 self.connection,
+                params=params if params else None, 
                 parse_dates=['start', 'end']
             )
 
