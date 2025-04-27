@@ -5,7 +5,6 @@ from src.data_receiver.weather_receiver import WeatherDataCollector
 
 
 def get_and_process_weather(target_date, db_handler):
-    """
     # 1. ENV
     load_dotenv()
     weather_api_key = os.environ.get("WEATHER_API_KEY")
@@ -26,7 +25,7 @@ def get_and_process_weather(target_date, db_handler):
     }
     
     db_handler.insert_weather_data(weather_data, weather_region_mapping, weather_col_mapping)
-    """
+
     # 4. WEATHER PROCESSING
     weather_data_inserted = db_handler.get_weather_data(daily_fetcher=True)
 
