@@ -2,7 +2,7 @@
 
 This project implements an automated system to forecast the likelihood of air raid alarms across various regions of Ukraine on an hourly basis. It serves as a functional tool designed to aid civilians in daily planning by providing advance notice of periods with heightened alarm risk.
 
-**Current Status:** The system is operational, featuring an automated daily pipeline for data collection, processing, prediction using a tuned machine learning model, evaluation, and forecast delivery via a web API and JSON file output.
+**Current Status:** Fully operational, providing daily automated forecasts via UI/API/JSON.
 
 ## Overview
 
@@ -13,69 +13,37 @@ The system uses multiple data sources to generate its forecasts:
 * **Telegram:** Monitors specific channels (e.g., `@war_monitor`) for relevant activity information.
 * **Visual Crossing Weather API:** Retrieves hourly weather forecasts for regional centers.
 
-Data is collected, processed, and stored in a MySQL database. An automated daily pipeline (`daily_forecast_orchestrator.py`) manages this workflow. Feature engineering includes creating lagged/summary alarm statistics, processing textual data from ISW and Telegram using NLP (TF-IDF + SVD), and deriving useful weather indicators.
-
-A tuned **HistGradientBoostingClassifier** model, trained on historical data, generates hourly predictions for the probability of an alarm being active (`is_alarm_active`). These predictions are evaluated daily against actual outcomes, and the forecasts are made available through a basic Flask web application and API endpoint.
+Data undergoes automated processing, including NLP (TF-IDF + SVD) for text sources and feature engineering for alarm patterns and weather. A tuned HistGradientBoostingClassifier model generates hourly predictions (`is_alarm_active` probability) for the next 24 hours. Forecasts are served via a Flask web application/API and saved daily. Performance is tracked automatically against actual alarm events.
 
 ## Features
 
-### Implemented
-
-*   **Multi-Source Data Collection:** Integrates data from UkraineAlarm API, ISW website scraping, Telegram monitoring (`telethon`), and Visual Crossing Weather API.
-*   **Centralized Database Storage:** Uses MySQL (`db_handler.py`) to store regions, raw/processed weather, ISW reports, Telegram messages, alarm history, merged features, model versions (including serialized blobs), predictions, and daily performance metrics.
-*   **Historical Data Ingestion:**
-    *   Scripts and database handler methods allow ingestion of data from Pandas DataFrames, enabling loading from CSV or other file formats.
-    *   Flexible mapping system to handle different column names/structures in source files.
-*   **Data Analysis & Preparation:**
-    *   Performed Exploratory Data Analysis (EDA) on weather, alarm, and ISW datasets, including temporal patterns, regional differences, and distributions. (See `historical_weather_EDA.ipynb`, `historical_alarm_quality_and_EDA.ipynb`)
-    *   Cleaned and standardized weather data, including outlier handling and imputation for missing visibility values. (See `historical_weather_quality_checks.ipynb`)
-    *   Engineered hourly alarm features. (See `historical_alarm_quality_and_EDA.ipynb`)
-    *   Processed ISW and Telegram reports using NLP: cleaning, lemmatization, stop-word removal. (See `isw_vectorization.ipynb` and  `telegram_vectorization.ipynb`)
-    *   Vectorized ISW and Telegram reports using TF-IDF (unigrams & bigrams) and applied Truncated SVD for dimensionality reduction (150 components). (See `isw_vectorization.ipynb` and  `telegram_vectorization.ipynb`)
-    *   Merged weather, alarm features, ISW SVD components and Telegram SVD components into a final hourly dataset. (See `final_dataset_refined.ipynb`)
-*   **Modeling & Evaluation:**
-    *   Split data using `TimeSeriesSplit` for chronologically sound training and testing. Scaled features using `StandardScaler`. Evaluated models using standard metrics (Accuracy, Precision, Recall, F1, ROC AUC) and confusion matrices. Tuned the models and identified top features based on model coefficients. (See `model_training_and_evaluation.ipynb` for linear and `training_and_evaluation.ipynb` for non-linear models)
-* **Automated Daily Pipeline:** Orchestrated execution (`daily_forecast_orchestrator.py`) handling data fetching, processing, prediction, evaluation, and output generation.
-* **Predictive Modeling:** Utilizes a tuned `HistGradientBoostingClassifier` (`hgb_v3`) optimized for high recall (target > 0.85) and acceptable precision (target >= 0.4). Model and associated scaler are stored in the database. (See `prediction_handler.py`)
-* **Daily Prediction & Storage:** Generates hourly predictions and raw probabilities for each region daily, storing them in the `predictions` table.
-* **Automated Evaluation:** Calculates daily performance metrics (Accuracy, Precision, Recall, F1, ROC AUC, Confusion Matrix) by comparing the previous day's predictions against actual alarm data and stores results in the `daily_metrics` table.
-* **Forecast Output:**
-    * Saves daily forecasts as a structured JSON file (`data/predictions/predictions_YYYY-MM-DD.json`).
-    * Provides forecasts via a Flask API endpoint (`/api/v1/alarm-forecast`).
-* **Web Interface:** Basic Flask application (`app.py`) serving an HTML page (`templates/index.html`) and the API.
-* **(Prototype) Model Retraining:** Includes a module (`retrain_handler.py`) designed for weekly retraining, currently non-operational due to resource constraints.
+* **Automated Daily Integration & Processing**: Collects and stores weather, alarm, ISW, and Telegram data daily. Cleans, imputes (esp. weather), and engineers features (lagged/summary stats, time features).  
+* **NLP for Text Signals**: Vectorizes ISW and Telegram reports using TF-IDF + TruncatedSVD to extract predictive features.  
+* **Optimized Modeling**: Uses a HistGradientBoostingClassifier tuned for high Recall (>0.80) and practical Precision (>0.30); model and scaler stored in DB.  
+* **Daily Workflow & Evaluation**: Orchestrates data handling, prediction, and evaluation. Compares forecasts with actuals and logs metrics. Includes a weekly retraining module (prototype).  
+* **Forecast Delivery**: Outputs predictions via JSON, REST API, and a web interface.  
+* **Modular & Cloud-Based**: Python modules deployed on AWS EC2/RDS.  
 
 ## System Architecture
 
-The system employs a modular Python structure:
+The system uses a modular Python structure hosted on AWS EC2, interacting with an AWS RDS database:
 
-1.  **Data Receivers (`src/data_receiver/`):** Modules for interacting with external sources (UkraineAlarm API, ISW, Telegram, Visual Crossing).
-2.  **Database Handler (`src/database/db_handler.py`):** Manages all MySQL database operations.
-3.  **Processing Pipeline (`src/pipeline/`):** Modules for cleaning, transforming, and engineering features from raw data (`alarm_processor.py`, `isw_processor.py`, `telegram_processor.py`, `weather_processor.py`).
-4.  **Forecasting Engine (`src/forecasting/`):** Includes `prediction_handler.py` for applying the model and `retrain_handler.py` (prototype) for updates.
-5.  **Orchestration (`src/forecasting/daily_forecast_orchestrator.py`):** Main script driving the daily workflow.
-6.  **Frontend/API (`src/frontend/app.py`):** Flask application serving the web interface and API.
-7.  **Database (MySQL):** Central data repository.
-8.  **Artifacts (`artifacts/`):** Stores pre-trained TF-IDF vectorizers and SVD reducers for ISW and Telegram text processing.
+1.  **Data Receivers (`src/data_receiver/`):** Modules for fetching data from external APIs and sources.
+2.  **Database Handler (`src/database/`):** Manages all database operations.
+3.  **Processing Pipeline (`src/pipeline/`):** Contains scripts for processing each raw data type.
+4.  **Forecasting Engine (`src/forecasting/`):** Manages model prediction, daily orchestration, and retraining (prototype).
+5.  **Frontend/API (`src/frontend`):** Serves the UI and API. 
+6.  **Artifacts (`artifacts/`):** Stores pre-trained NLP components (TF-IDF/SVD).
 
-*(See `docs/` folder for detailed Architecture, ERD, and Data Flow diagrams)*
+*(See `docs/` folder for detailed diagrams)*
 
 ## Technology Stack
 
-| Category                | Technologies                                                             | Status                |
-| :---------------------- | :----------------------------------------------------------------------- | :-------------------- |
-| Language                | Python 3.8.0                                                             | Implemented           |
-| Core Libraries          | `pandas`, `numpy`, `datetime`, `json`, `re`                              | Implemented           |
-| Data Acquisition        | `requests`, `re`, `alerts_in_ua`                                         | Implemented           |
-| Database                | AWS RDS (MySQL engine)                                                   | Implemented           |
-| DB Connector            | `mysql-connector-python`                                                 | Implemented           |
-| Cloud Platform          | AWS (EC2, RDS)                                                           | Implemented           |
-| Scheduling              | `cron` (Linux)                                                           | Implemented           |
-| Data Science            | `scikit-learn`, `matplotlib`, `seaborn`, `geopandas`                     | Implemented           |
-| NLP                     | `nltk`, `ftfy`                                                           | Implemented           |
-| Version Control         | Git                                                                      | Implemented           |
-| Web Framework           | Flask                                                                    | Implemented           |
-| App Server              | uWSGI                                                                    | Implemented           |
+* **Language:** Python 3.8.0
+* **Key Libraries:** Pandas, Scikit-learn, NLTK, Flask, Requests, Telethon, mysql-connector-python
+* **Infrastructure:** AWS EC2 (compute), AWS RDS (MySQL database), Cron (scheduling)
+
+*(See `requirements.txt` for full list)*
 
 ## Setup and Installation
 
@@ -137,14 +105,7 @@ The system employs a modular Python structure:
         *   Create tables: `db.create_tables()`
         *   Initialize regions: `db.initialize_regions_in_database()`
 
-8.  **Running Collectors Manually (for testing):**
-    *   Refer to the example notebooks (e.g., `receive_and_load.ipynb`) for using collectors and interacting with the database.
-
-9. **Historical Data Ingestion:**
-    *   Place historical CSV files in a known location.
-    *   Adapt scripts from example notebooks, defining `region_mapping` and `col_mapping` as needed, to read files into DataFrames and use `db.insert_..._data()` methods.
-
-10.  **Running the System:**
+8.  **Running the System:**
     * **Daily Pipeline:** Run the orchestrator script:
         ```bash
         python -m src.forecasting.daily_forecast_orchestrator
@@ -152,13 +113,23 @@ The system employs a modular Python structure:
         *Note: The first run might require Telegram authentication via console input.*
         Schedule this script using `cron` or another task scheduler for automated daily execution.
       
-11. **Data Analysis & Modeling Notebooks:**
+9. **Data Analysis & Modeling Notebooks:**
     *   The repository contains Jupyter notebooks detailing the all operations performed, see `notebooks/`
 
 ## Usage
 
 1.  **Automated Daily Run:** Set up a scheduler (`cron`) to run `src.forecasting.daily_forecast_orchestrator` daily.
 2.  **Check Output File:** Find the latest forecast JSON in the `data/predictions/` directory.
-3.  **Access Web Interface:** Start the Flask app (`src.frontend.app`)
+3.  **Access Web Interface:** Start the Flask app (`src.frontend.alarm_app_v1`)
 4.  **Use API Endpoint:** Send a POST request to `/api/v1/alarm-forecast` with a JSON body containing your `ALERTSAPP_TOKEN` and optionally a `region` field. 
 5.  **Database Inspection:** Connect to the MySQL database to view raw data, merged features, predictions, models, and metrics directly.
+
+## Example Interface
+
+Here's an example of the web interface displaying the hourly forecast:
+
+<div style="display: flex; justify-content: space-between;">
+  <img src="docs/ui_preview1.png" alt="Web Interface Selector" style="width: 49%; margin: 1%;">
+  <img src="docs/ui_preview2.png" alt="Web Interface Forecast for Chernivtsi" style="width: 49%; margin: 1%;">
+</div>
+
